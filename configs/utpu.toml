@@ -1,0 +1,9 @@
+[array]
+size = 2
+
+[datatypes]
+input_width = 4
+accumulator_width = 16
+
+[quantization]
+a = 2
