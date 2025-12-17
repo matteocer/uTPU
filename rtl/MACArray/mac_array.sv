@@ -5,16 +5,23 @@ module mac_array #(
 	parameter INPUT_DATA_WIDTH 	 = 4,
 	parameter ACCUMULATOR_DATA_WIDTH = 16
     ) (
-	input logic clk, 
-	input logic  [ARRAY_SIZE-1:0] in_a   [INPUT_DATA_WIDTH-1:0],
-	input logic  [ARRAY_SIZE-1:0] in_b   [INPUT_DATA_WIDTH-1:0],
-	output logic [ARRAY_SIZE-1:0] accumulator [ACCUMULATOR_DATA_WIDTH-1:0]
+	input logic clk, compute, load_en, 
+	input logic  [INPUT_DATA_WIDTH-1:0] 	  in          [ARRAY_SIZE-1:0],
+	output logic [ACCUMULATOR_DATA_WIDTH-1:0] accumulator [ARRAY_SIZE-1:0]
     );
 
     genvar i;
     generate 
 	for (i = 0; i < ARRAY_SIZE; i++) begin: gen_mac
-	    mac mac_0 (.*);
+	    mac #(
+		.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH),
+		.ACCUMULATOR_DATA_WIDTH(ACCUMULATOR_DATA_WIDTH),
+	    ) u_mac (
+		.clk(clk),
+		.load_en(load_en),
+		.in(in[i]),
+		.accumulator(accumulator[i])
+	    );
 	end
     endgenerate
 

@@ -6,7 +6,7 @@ module leaky_relu #(
     );
     
     always_comb begin
-	if (in > 0)
+	if (in < 8)
 	    result = in;
 	else
 	    result = in >>> A;
