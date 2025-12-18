@@ -1,6 +1,6 @@
 module fifo #(
 	parameter FIFO_WIDTH = 256,
-	parameter DATA_WIDTH = 8
+	parameter FIFO_DATA_WIDTH = 8
     ) (
 	input  logic clk, rst, we, re,
 	output logic empty, full,
@@ -10,7 +10,7 @@ module fifo #(
     
     localparam POINTER_WIDTH = $clog2(FIFO_WIDTH);
 
-    logic [DATA_WIDTH-1:0] mem [FIFO_WIDTH-1:0];
+    logic [FIFO_DATA_WIDTH-1:0] mem [FIFO_WIDTH-1:0];
 
     logic write_ok, read_ok;
     logic [POINTER_WIDTH:0] w_ptr, r_ptr; // Read and write pointers with extra MSB (Cummings 2002)

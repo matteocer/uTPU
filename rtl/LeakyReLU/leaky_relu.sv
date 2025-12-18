@@ -1,15 +1,16 @@
 module leaky_relu #(
-	parameter A = 2
+	parameter ALPHA		         = 2,
+	parameter COMPUTE_DATA_WIDTH     = 4
     ) (	
-	input  logic [3:0] in,
-	output logic [3:0] result
+	input  logic signed [COMPUTE_DATA_WIDTH-1:0] in,
+	output logic signed [COMPUTE_DATA_WIDTH-1:0] result
     );
     
     always_comb begin
-	if (in < 8)
+	if (in >= 0)
 	    result = in;
 	else
-	    result = in >>> A;
+	    result = in >>> ALPHA;
     end
 
 endmodule: leaky_relu

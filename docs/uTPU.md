@@ -4,8 +4,13 @@
 
 ### Overview
 
-Takes in commands from an ESP32 communicating over UART (
-Maybe SPI later) directly with the FPGA pins, 
+Composed of an 8-bit UART communications module
+buffered with a 256 B wide FIFO on the UART input
+and output. These FIFOs connect to the unified buffer, 
+which has a word size of 2 B. The memory connects to 
+the compute unit made of a 4-bit 2x2 systolic array, 
+quantizer, and leakyrelu modules.
+
 
 
 ### Modules
@@ -56,26 +61,40 @@ Maybe SPI later) directly with the FPGA pins,
 
 #### Unified Buffer:
     All of the tensor are stored here
-    1 KB
-    0x000-0x3FF TOTAL
+    1 KB with 2 Byte words
 
-    0x000-0x0FF Tensor A
-    0x100-0x1FF Tensor B
-    0x200-0x2FF Tensor C
-    0x300-0x3FF Free
+    0x000-0x2FF TOTAL
+
+    0x000-0x07F Tensor A
+    0x080-0x0FF Tensor B
+    0x100-0x17F Tensor C
+    0x180-0x1FF Free
 
     Control signals:
-    - WE
-    - RE
-    - ARRAY_EN
-    - FIFO_EN
+    - we 
+    - re
+    - array_en
+    - fifo_en
 
 #### FIFO:
     This is a queue between the uart module and the core
     It's values are one byte wide and is 256 B in total.
     
-    0x000 - 0x0FF
+    Design based on: Simulation and Synthesis Techniques for Asynchronous
+    FIFO Design - Clifford E. Cummings 
+    - The method uses both a w_ptr and r_ptr instead of moving the data
+    around
+    
 
+    0x000 - 0x0FF
+    
+    Has a pointer which points to first open slot
+    Control Signals:
+    - clk
+    - rst
+    - we
+    - re
+    
     Flags:
     - Empty
     - Full
