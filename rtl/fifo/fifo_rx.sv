@@ -1,8 +1,8 @@
-module fifo #(
+module fifo_rx #(
 	parameter FIFO_WIDTH = 256,
 	parameter FIFO_DATA_WIDTH = 8
     ) (
-	input  logic clk, rst, we, re,
+	input  logic clk, rst, we, re, valid,
 	output logic empty, full,
 	input  logic [FIFO_DATA_WIDTH-1:0] w_data,
 	output logic [FIFO_DATA_WIDTH-1:0] r_data
@@ -19,7 +19,7 @@ module fifo #(
     assign empty = (w_ptr == r_ptr);
     assign full  = (w_ptr == {~r_ptr[POINTER_WIDTH], r_ptr[POINTER_WIDTH-1:0]});
 
-    assign write_ok = we && !full;
+    assign write_ok = we && !full && valid;
     assign read_ok  = re && !empty;
 
     always_ff @(posedge clk) begin
@@ -38,4 +38,4 @@ module fifo #(
 	end
     end
     
-endmodule: fifo
+endmodule: fifo_rx

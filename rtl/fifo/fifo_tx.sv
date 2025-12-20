@@ -1,9 +1,9 @@
-module fifo #(
+module fifo_tx #(
 	parameter FIFO_WIDTH = 256,
 	parameter FIFO_DATA_WIDTH = 8
     ) (
 	input  logic clk, rst, we, re,
-	output logic empty, full,
+	output logic start, empty, full,
 	input  logic [FIFO_DATA_WIDTH-1:0] w_data,
 	output logic [FIFO_DATA_WIDTH-1:0] r_data
     );
@@ -23,6 +23,7 @@ module fifo #(
     assign read_ok  = re && !empty;
 
     always_ff @(posedge clk) begin
+	start <= 1'b0;
 	if (rst) begin
 	    w_ptr   <= 0;
 	    r_ptr   <= 0;
@@ -33,9 +34,10 @@ module fifo #(
 	    end
 	    if (read_ok) begin
 		r_data <= mem[r_ptr[POINTER_WIDTH-1:0]];
+		start <= 1'b1;
 		r_ptr  <= r_ptr + 1'b1;
 	    end
 	end
     end
     
-endmodule: fifo
+endmodule: fifo_tx

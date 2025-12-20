@@ -12,6 +12,8 @@ the compute unit made of a 4-bit 2x2 systolic array,
 quantizer, and leakyrelu modules.
 
 
+### ISA
+
 
 ### Modules
 #### UART Module
@@ -63,12 +65,10 @@ quantizer, and leakyrelu modules.
     All of the tensor are stored here
     1 KB with 2 Byte words
 
-    0x000-0x2FF TOTAL
+    0x000-0x1FF TOTAL
 
-    0x000-0x07F Tensor A
-    0x080-0x0FF Tensor B
-    0x100-0x17F Tensor C
-    0x180-0x1FF Free
+    0x000-0x17F Free
+    0x180-0x1FF Program Memory
 
     Control signals:
     - we 
