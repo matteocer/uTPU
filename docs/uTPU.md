@@ -13,17 +13,26 @@ quantizer, and leakyrelu modules.
 
 
 ### ISA
-Instructions are 12 bits wide
+    Instructions are 16 bits wide
 
-[OPCODE] [ADDRESS]
-
+    4 bits    1 bit                   9 bits     8 bits
+    [OPCODE] [ADDRESS OR IMMEDIATE]   [ADDRESS]/[IMMEDIATE]  
+              0          1
 #### Instructions
-STORETOP/STOREBOT - which loads the top/bottom of the 16 bit mem location
-ENRELU/DISRELU - which change the activation state of RELU module
-LOADIN - loads the 4 vals at the address into the compute unit input
-LOADWEI - loads the 4 weights at the address into mac array
-RUN -  allows the inputs to flow through the compute unit
-FETCHTOP/FETCHBOT - which returns the top/bottom 8 bits at mem location
+    0x1      0x2
+    STORETOP/STOREBOT - which loads the top/bottom of the 16 bit mem location
+    0x3    0x4
+    ENRELU/DISRELU - which change the activation state of RELU module
+    0x5
+    LOADIN - loads the 4 vals at the address into the compute unit input
+    0x6 
+    LOADWEI - loads the 4 weights at the address into mac array
+    0x7
+    RUN -  allows the inputs to flow through the compute unit
+    0x8      0x9
+    FETCHTOP/FETCHBOT - which returns the top/bottom 8 bits at mem location
+    0xF  
+    NOP
 
 ### Modules
 #### UART Module

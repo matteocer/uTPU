@@ -153,7 +153,8 @@ module top #(
 
 
     typedef enum logic [] {
-	
+	IDLE,
+
     } state_e
 
 endmodule: top`
