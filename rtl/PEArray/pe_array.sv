@@ -7,13 +7,13 @@ module pe_array #(
 	parameter ACCUMULATOR_DATA_WIDTH = 16
     ) (
 	input logic clk, rst, compute, load_en,
-	input logic [COMPUTE_DATA_WIDTH-1:0] ins [ARRAY_SIZE_WIDTH-1:0],
-	output logic [ACCUMULATOR_DATA_WIDTH-1:0] results [ARRAY_SIZE_WIDTH-1:0]
+	input logic [COMPUTE_DATA_WIDTH-1:0] ins [ARRAY_SIZE-1:0],
+	output logic [ACCUMULATOR_DATA_WIDTH-1:0] results [ARRAY_SIZE-1:0]
     );
 
     
-    logic [ACCUMULATOR_DATA_WIDTH-1:0] accumulators [ARRAY_SIZE_WIDTH-1:0][ARRAY_SIZE_WIDTH-1:0];
-    logic [COMPUTE_DATA_WIDTH-1:0] activations [ARRAY_SIZE_WIDTH-1:0][ARRAY_SIZE_WIDTH:0];
+    logic [ACCUMULATOR_DATA_WIDTH-1:0] accumulators [ARRAY_SIZE-1:0][ARRAY_SIZE-1:0];
+    logic [COMPUTE_DATA_WIDTH-1:0] activations [ARRAY_SIZE-1:0][ARRAY_SIZE:0];
 
     genvar i, j;
     generate 

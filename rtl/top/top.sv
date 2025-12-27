@@ -60,7 +60,7 @@ module top #(
 
     // ReLU data
     logic [COMPUTE_DATA_WIDTH-1:0] relu_in [RELU_SIZE-1:0];
-    logic [COMPUTE_DATA_WIDTH-1:0] relu_out [RELU_SIZE_WIDTH-1:0];
+    logic [COMPUTE_DATA_WIDTH-1:0] relu_out [RELU_SIZE-1:0];
 
 
     // Buffer control signals/flags
@@ -374,7 +374,7 @@ module top #(
 
     // UART communication happens at the same time as everything else
     always_ff @(posedge clk) begin: uart communication
-			
+		
     end
 
 

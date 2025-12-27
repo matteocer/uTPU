@@ -11,7 +11,7 @@ which has a word size of 2 B. The memory connects to
 the compute unit made of a 4-bit 2x2 systolic array, 
 quantizer, and leakyrelu modules.
 
-UART RX -> FIFO RX -------------|
+UART RX -> FIFO RX ------------>|
                       MAC ARRAY | BUFFER
                                 |
                       QUANTIZER |
