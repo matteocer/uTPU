@@ -10,7 +10,7 @@ module top #(
 	parameter ARRAY_SIZE_WIDTH       = $clog2(ARRAY_SIZE),
 	parameter FIFO_WIDTH		 = 256,
 	parameter FIFO_DATA_WIDTH	 = 8,
-	parameter BUFFER_SIZE		 = 1024,
+	parameter BUFFER_SIZE		 = 512,
 	parameter BUFFER_WORD_SIZE	 = 16,
 	parameter ADDRESS_SIZE		 = $clog2(BUFFER_SIZE),
 	parameter OPCODE_WIDTH	 	 = 3,
@@ -289,7 +289,7 @@ module top #(
 			    instruction_half <= 1'b1;
 			end else if (~rx_empty && instruction_half) begin
 			    rx_re            <= 1'b1;
-			    address[ADDRESS_SIZE:FIFO_DATA_WIDTH] <= rx_fifo_to_mem;
+			    address[ADDRESS_SIZE-1:FIFO_DATA_WIDTH] <= rx_fifo_to_mem;
 			    rx_re            <= 1'b0;
 			    instruction_half <= 1'b0;
 			end
