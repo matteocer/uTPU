@@ -186,3 +186,12 @@ UART TX <- FIFO TX <------------|
 
 ### Possible Problems in Design
     1. What happens if UART_RX begins receiving data before the fifo has stored the previous
+
+
+
+### What to do
+
+    Fix the laning issue between the buffer and compute 
+        - mem to 4-input
+    Work out how to control the parameters with the toml file
+

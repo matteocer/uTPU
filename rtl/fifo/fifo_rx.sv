@@ -26,6 +26,7 @@ module fifo_rx #(
 	if (rst) begin
 	    w_ptr   <= 0;
 	    r_ptr   <= 0;
+	    r_data  <= 0;
 	end else begin 
 	    if (write_ok) begin
 		mem[w_ptr[POINTER_WIDTH-1:0]] <= w_data;

@@ -396,9 +396,9 @@ module top #(
 
 	//Tx Control
 	if (~tx_we && ~tx_empty)
-	    tx_rx <= 1'b1;
+	    tx_re <= 1'b1;
 	else 
-	    tx_rx <= 1'b0;
+	    tx_re <= 1'b0;
 
     end
 
