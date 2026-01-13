@@ -16,6 +16,13 @@ module pe_array #(
      
     logic [ACCUMULATOR_DATA_WIDTH-1:0] accumulators [ARRAY_SIZE-1:0][ARRAY_SIZE-1:0];
     logic [COMPUTE_DATA_WIDTH-1:0] activations [ARRAY_SIZE-1:0][ARRAY_SIZE:0];
+    
+
+    if (load_en)
+	for (j = 0; j < ARRAY_SIZE; j++) begin: load_weights
+	    assign activations[i][j] = ins[i*ARRAY_SIZE + j];
+	end
+
 
     genvar i, j;
     generate 

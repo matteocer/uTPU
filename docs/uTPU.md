@@ -39,7 +39,8 @@ UART TX <- FIFO TX <------------|
     3 bits    1 bit        1 bits        1 bit     9 bits
     [OPCODE] [COMPUTE_EN] [QUANTIZER_EN] [RELU_EN] [RESULT_ADDRESS]
 
-    B-TYPE LOAD ( WILL HAVE TO BE CHANGED IF DIMENSIONS OF MAC ARRAY CHANGES)
+    B-TYPE LOAD ( WILL HAVE TO BE CHANGED IF DIMENSIONS OF MAC ARRAY CHANGES) for 2x2 loads top values
+    may need to be changed if array size is not divisible by 4
     3 bits    1 bit                  3 bits     9 bits
     [OPCODE] [IN/WEIGHTS INDICATOR] [NOT USED] [ADDRESS]
 
