@@ -31,7 +31,7 @@ module pe_array_tb2;
   endtask
 
   task automatic clear_weights_in();
-    for (int j = 0; j < ARRAY_SIZE; j++) weights_in[j] = '0;
+    for (int j = 0; j < ARRAY_SIZE*ARRAY_SIZE; j++) weights_in[j] = '0;
   endtask
 
   // Pretty printer: shows the internal mesh at a clock edge
@@ -50,13 +50,11 @@ module pe_array_tb2;
 
     // Probe PE-local stored weights (the internal reg inside each PE)
     $display("  weights loaded (PE local regs):");
-    for (int r = 0; r < ARRAY_SIZE; r++) begin
-	$write("    row[%0d]: ", r);
-	for (int c = 0; c < ARRAY_SIZE; c++) begin
-	    $write("%0d ", dut);
-	end
+    $write("  weights[0]: %0d %0d", dut.gen_rows[0].gen_cols[0].u_pe.weight, dut.gen_rows[0].gen_cols[1].u_pe.weight);
     $write("\n");
-    end
+    $write("  weights[1]: %0d %0d", dut.gen_rows[1].gen_cols[0].u_pe.weight, dut.gen_rows[1].gen_cols[1].u_pe.weight);
+    $write("\n");
+    
 
 
 
@@ -123,12 +121,15 @@ module pe_array_tb2;
     // -------------------------
     compute = 1;
 
-    ins[0] = 1; ins[1] = 3;
+    ins[0] = 1;
     @(posedge clk); dump_state("after inject k=0");
 
-    ins[0] = 2; ins[1] = 4;
+    ins[0] = 3; ins[1] = 2;
     @(posedge clk); dump_state("after inject k=1");
 
+    ins[0] = 0; ins[1] = 4;
+    @(posedge clk); dump_state("after inject k=2");
+    
     clear_ins();
     repeat (4) begin
       @(posedge clk);
@@ -141,3 +142,9 @@ module pe_array_tb2;
   end
 
 endmodule
+
+
+// [1, 2] [5, 6]
+// [3, 4] [7, 1]
+//
+// [23 

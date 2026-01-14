@@ -31,7 +31,7 @@ module pe_array #(
      
     logic signed [ACCUMULATOR_DATA_WIDTH-1:0] accumulators [ARRAY_SIZE-1:0][ARRAY_SIZE-1:0];
     logic signed [COMPUTE_DATA_WIDTH-1:0]     activations  [ARRAY_SIZE-1:0][ARRAY_SIZE:0];
-    
+     
 
     genvar i, j;
     generate 
@@ -43,8 +43,8 @@ module pe_array #(
 	    assign results[i] = accumulators[ARRAY_SIZE-1][i];
 	end
 
-	for (i = 0; i < ARRAY_SIZE; i++) begin: rows
-	    for (j = 0; j < ARRAY_SIZE; j++) begin: cols
+	for (i = 0; i < ARRAY_SIZE; i++) begin: gen_rows
+	    for (j = 0; j < ARRAY_SIZE; j++) begin: gen_cols
 		pe #(
 		    COMPUTE_DATA_WIDTH,
 		    ACCUMULATOR_DATA_WIDTH

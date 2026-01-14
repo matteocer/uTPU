@@ -30,10 +30,10 @@ module pe #(
 
     always_ff @(posedge clk) begin
         if (rst) begin
-	    weight          <= '0;
+	        weight          <= '0;
             data_out        <= '0;
             partial_sum_out <= '0;
-        end else begin
+	   end else begin
             data_out <= data_in;
             if (load_en) 
 		weight <= weight_in;
