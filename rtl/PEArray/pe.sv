@@ -30,14 +30,14 @@ module pe #(
 
     always_ff @(posedge clk) begin
         if (rst) begin
-	        weight          <= '0;
+	    weight          <= '0;
             data_out        <= '0;
             partial_sum_out <= '0;
-	   end else begin
+	end else begin
             data_out <= data_in;
-            if (load_en) 
+	    if (load_en) 
 		weight <= weight_in;
-            else if (compute) 
+	    else if (compute) 
 		partial_sum_out <= partial_sum_in + 
 		               $signed((ACCUMULATOR_DATA_WIDTH)'($signed(data_in) * $signed(weight)));
         end
