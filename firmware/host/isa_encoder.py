@@ -40,11 +40,13 @@ def encodeStoreValues(addr: int, values: List[int]) -> bytes:
 
     word1 = OPCODE_STORE #bits 0-2
     word1 |= (1 <<4) #bit 4: immediate mode
-    word1 |= (addr << 7) #bit 7-15: address
+    # word1 |= (addr << 7) # REMOVED: address is now in word 3
     
     word2 = int4To16(values)
+    
+    word3 = addr # Destination address
 
-    return instructionToBytes(word1) + instructionToBytes(word2)
+    return instructionToBytes(word1) + instructionToBytes(word2) + instructionToBytes(word3)
 
 #encode STORE instruction that copies from one address to another
 def encodeStoreAddress(destAddr: int, srcAddr: int) -> bytes:
@@ -53,10 +55,13 @@ def encodeStoreAddress(destAddr: int, srcAddr: int) -> bytes:
 
     word1 = OPCODE_STORE #bits 0-2
     word1 |= (0 << 4) #bit 4: address mode (not immediate)
-    word1 |= (destAddr << 7) #destination address 
+    # word1 |= (destAddr << 7) # REMOVED: destination address is now in word 3
 
     word2 = srcAddr
-    return instructionToBytes(word1) + instructionToBytes(word2)
+    
+    word3 = destAddr
+
+    return instructionToBytes(word1) + instructionToBytes(word2) + instructionToBytes(word3)
 
 #encode LOAD instruction
 def encodeLoad(addr: int, is_weights:bool) -> bytes:
@@ -179,7 +184,7 @@ if __name__ == "__main__":
     print("=" * 50)
     print("\nIndividual instruction tests:")
     store_bytes = encodeStoreValues(0x080, [1, 2, 3, 4])
-    print(f"STORE 0x080, [1,2,3,4]: {store_bytes.hex()}")
+    print(f"STORE 0x080, [1,2,3,4] (3 words): {store_bytes.hex()}")
     load_w_bytes = encodeLoadWeights(0x080)
     print(f"LOADWEI 0x080: {load_w_bytes.hex()}")
     load_i_bytes = encodeLoadInputs(0x000)
