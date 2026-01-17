@@ -210,7 +210,7 @@ module top #(
 
 
     logic [BUFFER_WORD_SIZE-1:0] instruction;
-    logic 		         instruction_half;
+    logic 		         instruction_half; // determines if this is the top or bottom of instruction
     logic 	  		 fetch_bot;
 
     opcode_e opcode;
@@ -232,11 +232,13 @@ module top #(
 	case (current_state)
 	    RESET_STATE:
 		next_state = FETCH_FIFO_STATE; // Assuming reset can happen in one clk cycle
-	    FETCH_FIFO_STATE: 
+	    FETCH_FIFO_STATE:
 		if (~rx_empty && instruction_half) begin
-		    if (fetch_mode == FETCH_ADDRESS && address_indicator)
+		    if (fetch_mode == FETCH_ADDRESS && address_indicator && ~fetch_bot)
 			next_state = FETCH_ADDRESS_STATE;
-		    else
+		    else if (fetch_mode == FETCH_ADDRESS && fetch_bot)
+			next_state = STORE_STATE;
+		    else if (fetch_mode != FETCH_ADDRESS)
 			next_state = DECODE_STATE;
 		end
 	    DECODE_STATE:
@@ -255,9 +257,8 @@ module top #(
 			next_state = FETCH_FIFO_STATE;
 		endcase
 	    FETCH_ADDRESS_STATE:
-		if (buffer_done) begin
-		    if (
-		    next_state = STORE_STATE;
+		if (buffer_done)
+		    next_state = FETCH_FIFO_STATE;
 	    FETCH_BUFFER_STATE:
 		if (buffer_done)
 		   next_state = FETCH_FIFO_STATE;
@@ -283,7 +284,8 @@ module top #(
 		rx_re            <= 1'b0;
 		tx_we            <= 1'b0;
 		compute_start    <= 1'b0;
-	        fetch_mode       <= FETCH_INSTRUCTION;		
+	        fetch_mode       <= FETCH_INSTRUCTION;	
+		fetch_bot        <= '0;
 	    end
 	    // before you enter, you must set fetch_mode and
 	    // instruction_half to 0
@@ -299,22 +301,35 @@ module top #(
 			    end else if (~rx_empty && instruction_half) begin
 				rx_re            <= 1'b1;
 				instruction[BUFFER_WORD_SIZE-1:FIFO_DATA_WIDTH] <= rx_fifo_to_mem;
-				instruction_half <= 1'b0;
-				
+				instruction_half <= 1'b0;	
 			    end
 			end
 		    end
 		    FETCH_ADDRESS: begin
-			if (~rx_empty && ~instruction_half) begin
-			    rx_re            <= 1'b1;
-			    address[FIFO_DATA_WIDTH-1:0] <= rx_fifo_to_mem;
-			    rx_re            <= 1'b0;
-			    instruction_half <= 1'b1;
-			end else if (~rx_empty && instruction_half) begin
-			    rx_re            <= 1'b1;
-			    address[ADDRESS_SIZE-1:FIFO_DATA_WIDTH] <= rx_fifo_to_mem;
-			    rx_re            <= 1'b0;
-			    instruction_half <= 1'b0;
+			if (~rx_empty) begin
+			    if (address_indicator) begin // if fetching values from mem
+				if (instruction_half) begin
+				    rx_re            <= 1'b1;
+				    address[ADDRESS_SIZE-1:FIFO_DATA_WIDTH] <= rx_fifo_to_mem;
+				    instruction_half <= 1'b0;
+				end else begin
+				    rx_re            <= 1'b1;
+				    address[FIFO_DATA_WIDTH-1:0] <= rx_fifo_to_mem;
+				    instruction_half <= 1'b1;
+				     
+				end
+			    end else begin // if fetching the values from fifo
+				if (instruction_half) begin
+				    rx_re 	        <= 1'b1;
+				    store_val[FIF0_DATA_WIDTH*2-1:FIFO_DATA_WIDTH] <= rx_fifo_to_mem;
+				    instruction_half    <= '0;
+				end else begin
+				    rx_re 		<= 1'b1;
+				    store_val[FIFO_DATA_WIDTH-1:0] <= rx_fifo_to_mem;
+				    instruction_half    <= 1'b1;
+				end	
+			    end
+			    fetch_bot <= 1'b1;
 			end
 		    end
 		endcase
@@ -324,7 +339,10 @@ module top #(
 		case (opcode)
 		    STORE_OP: begin	
 			address_indicator <= (instruction[4]) ? 1'b1 : 1'b0;
-			fetch_mode        <= FETCH_ADDRESS;
+			if (address_indicator)
+			    fetch_mode <= FETCH_ADDRESS;
+			else 
+			    fetch_mode <= FETCH_INTS;
 		    end
 		    FETCH_OP: begin
 			bot_mem    <= (instruction[3]) ? 1'b1 : 1'b0;
@@ -348,14 +366,15 @@ module top #(
 	    FETCH_ADDRESS_STATE: begin
 		rx_re <= '0;
 		if (~tx_full) begin
-		    compute_load_en   <= 1'b0;
-		    buffer_re         <= 1'b1;
-		    buffer_we         <= 1'b0;
-		    buffer_compute_en <= 1'b1;
+		    compute_load_en <= 1'b0;
+		    buffer_re       <= 1'b1;
+		    buffer_we       <= 1'b0;
+		    buffer_store_en <= 1'b1;
 		    if (buffer_done) begin
-			store_val <= mem_to_compute[BUFFER_WORD_SIZE-1:0];
-			buffer_re <= 1'b0;
-			buffer_compute_en <= 1'b0;
+			store_val       <= buffer_to_controller[BUFFER_WORD_SIZE-1:0];
+			buffer_re       <= 1'b0;
+			buffer_store_en <= 1'b0;
+			fetch_bot       <= 1'b1;
 		    end
 		end
 	    end
@@ -414,14 +433,14 @@ module top #(
 		    compute_start <= '0;
 	    end
 	    STORE_STATE: begin
-		buffer_we <= 1'b1;
-		buffer_re <= 1'b0;
-		buffer_fifo_en <= 1'b0;
+		buffer_we         <= 1'b1;
+		buffer_re         <= 1'b0;
+		buffer_fifo_en    <= 1'b0;
 		buffer_compute_en <= 1'b0;
-		buffer_store_en <= 1'b1;
+		buffer_store_en   <= 1'b1;
 		fifo_to_buffer[BUFFER_DATA_WIDTH-1:0] <= store_val;
 		if (buffer_done) begin
-		    buffer_we <= '0;
+		    buffer_we       <= '0;
 		    buffer_store_en <= '0;
 		end
 	    end
