@@ -9,6 +9,7 @@ module pe_controller #(
 	parameter NUM_COMPUTE_LANES      = BUFFER_WORD_SIZE/COMPUTE_DATA_WIDTH
     ) (
 	input  logic clk, rst, compute, load_en,
+	output logic done,
 	input  logic signed [COMPUTE_DATA_WIDTH-1:0]     datas_arr   [ARRAY_SIZE*ARRAY_SIZE-1:0],
 	input  logic signed [COMPUTE_DATA_WIDTH-1:0]     weights_in  [ARRAY_SIZE*ARRAY_SIZE-1:0],
 	output logic signed [ACCUMULATOR_DATA_WIDTH-1:0] results_arr [ARRAY_SIZE*ARRAY_SIZE-1:0]
@@ -23,6 +24,7 @@ module pe_controller #(
     int i;
 
     always_ff @(posedge clk) begin
+	done <= '0;
 	if (rst) begin
 	    cycle_count <= '0;
 	    for (i=0; i < ARRAY_SIZE; i++)
@@ -45,6 +47,8 @@ module pe_controller #(
 	    for (i=0; i < ARRAY_SIZE*ARRAY_SIZE; i++) begin
 		if (ARRAY_SIZE + 1 + (i % ARRAY_SIZE) + (i / ARRAY_SIZE) == cycle_count) begin
 		    results_arr[i] <= results[i % ARRAY_SIZE];
+		    if (i == ARRAY_SIZE*ARRAY_SIZE-1) 
+			done <= 1'b1;
 		end
 	    end
 	end

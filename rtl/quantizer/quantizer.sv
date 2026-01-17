@@ -5,10 +5,10 @@ module quantizer #(
 	parameter ACCUMULATOR_DATA_WIDTH = 16,
 	parameter COMPUTE_DATA_WIDTH     = 4
     ) ( 
-	input  logic [ACCUMULATOR_DATA_WIDTH-1:0]  in,
-	output logic [COMPUTE_DATA_WIDTH-1:0] 	   result
+	input  signed logic [ACCUMULATOR_DATA_WIDTH-1:0]  in,
+	output signed logic [COMPUTE_DATA_WIDTH-1:0] 	  result
     );
     
-    assign result = in >> ACCUMULATOR_DATA_WIDTH - COMPUTE_DATA_WIDTH;
+    assign result = in >>> ACCUMULATOR_DATA_WIDTH - COMPUTE_DATA_WIDTH;
 
 endmodule: quantizer

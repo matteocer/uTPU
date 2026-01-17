@@ -8,16 +8,18 @@ module unified_buffer #(
 	parameter COMPUTE_DATA_WIDTH = 4,  // Number of bits recieved/sent from/to compute unit
 	parameter ADDRESS_SIZE       = $clog2(BUFFER_SIZE),
 	parameter ARRAY_SIZE         = 8,
-	parameter NUM_COMPUTE_LANES  = ARRAY_SIZE*ARRAY_SIZE
+	parameter NUM_COMPUTE_LANES  = ARRAY_SIZE*ARRAY_SIZE,
+	parameter STORE_DATA_WIDTH   = 16
     ) (
-	input  logic clk, we, re, compute_en, fifo_en,
+	input  logic clk, we, re, compute_en, fifo_en, store_en,
 	output logic 			      done,
 	input  logic 			      section,  // Used for fifo where 0 top/1 bot
 	input  logic [ADDRESS_SIZE-1:0]	      address,
 	input  logic [FIFO_DATA_WIDTH-1:0]    fifo_in,
 	output logic [FIFO_DATA_WIDTH-1:0]    fifo_out,
 	input  logic [COMPUTE_DATA_WIDTH-1:0] compute_in [NUM_COMPUTE_LANES-1:0], 
-	output logic [COMPUTE_DATA_WIDTH-1:0] compute_out [NUM_COMPUTE_LANES-1:0] 
+	output logic [COMPUTE_DATA_WIDTH-1:0] compute_out [NUM_COMPUTE_LANES-1:0],
+	input  logic [STORE_DATA_WIDTH-1:0]   store_in
     ); 
     
     localparam int ITEMS_IN_SLOT = BUFFER_WORD_SIZE/COMPUTE_DATA_WIDTH;
@@ -42,7 +44,9 @@ module unified_buffer #(
                     1'b0: mem[address][0 +: FIFO_DATA_WIDTH] <= fifo_in;                // low byte
                     1'b1: mem[address][FIFO_DATA_WIDTH +: FIFO_DATA_WIDTH] <= fifo_in;  // high byte
                 endcase
-            end
+	    end else if (store_in) begin 
+		mem[address][STORE_DATA_WIDTH-1:0] <= store_in;
+	    end
             done <= 1'b1;
 
         end else if (re) begin
