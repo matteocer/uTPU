@@ -258,7 +258,7 @@ int main(int argc, char* argv[]) {
     char line[MAX_LINE_LENGTH];
     while (fgets(line, sizeof(line), fp)) {
         line_num++;
-        uint16_t out[2];
+        uint16_t out[3];
         int words = encode_instruction(line, line_num, out);
         if (words < 0) errors++;
         else if (words > 0) {
