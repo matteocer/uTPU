@@ -65,10 +65,10 @@ module unified_buffer #(
                     1'b1: fifo_out <= mem[address][FIFO_DATA_WIDTH +: FIFO_DATA_WIDTH];
                 endcase
 	    end else if (store_en) begin
-		store_out <= mem[address][STORE_DATA_WIDTH-1:0];1
+		store_out <= mem[address][STORE_DATA_WIDTH-1:0];
+	    end
             done <= 1'b1;
         end
     end
-
 
 endmodule: unified_buffer

@@ -9,7 +9,7 @@ module uart_transmitter #(
 	input  logic [UART_BITS_TRANSFERED-1:0] message
     );
 
-    typedef enum logic {
+    typedef enum logic [1:0] {
 	IDLE,
 	START,
 	MESSAGE,

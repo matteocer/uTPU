@@ -129,7 +129,7 @@ module top #(
 	.done(compute_done),
 	.datas_arr(compute_in),
 	.weights_in(compute_in),
-	.results(compute_out)
+	.results_arr(compute_out)
     );
 
     quantizer_array #(
@@ -202,10 +202,9 @@ module top #(
 	NOP    
     } opcode_e;
     
-    typedef enum logic [1:0] {
+    typedef enum logic {
 	FETCH_INSTRUCTION,
-	FETCH_ADDRESS, //ONLY USED FOR STORES
-	FETCH_INTS, //ONLY USED FOR STORES
+	FETCH_ADDRESS //ONLY USED FOR STORES
     } fetch_mode_e;
 
 
@@ -321,7 +320,7 @@ module top #(
 			    end else begin // if fetching the values from fifo
 				if (instruction_half) begin
 				    rx_re 	        <= 1'b1;
-				    store_val[FIF0_DATA_WIDTH*2-1:FIFO_DATA_WIDTH] <= rx_fifo_to_mem;
+				    store_val[FIFO_DATA_WIDTH*2-1:FIFO_DATA_WIDTH] <= rx_fifo_to_mem;
 				    instruction_half    <= '0;
 				end else begin
 				    rx_re 		<= 1'b1;
@@ -339,10 +338,7 @@ module top #(
 		case (opcode)
 		    STORE_OP: begin	
 			address_indicator <= (instruction[4]) ? 1'b1 : 1'b0;
-			if (address_indicator)
-			    fetch_mode <= FETCH_ADDRESS;
-			else 
-			    fetch_mode <= FETCH_INTS;
+			fetch_mode <= FETCH_ADDRESS;
 		    end
 		    FETCH_OP: begin
 			bot_mem    <= (instruction[3]) ? 1'b1 : 1'b0;
@@ -404,27 +400,27 @@ module top #(
 		if (~compute_en && ~quantizer_en && relu_en) begin // relu only
 		    relu_in           <= mem_to_compute;
 		    compute_to_buffer <= relu_out; 
-		end else if (~compute_en && quantizer_en && ~relu_en) begin // only quantizer
-		    quantizer_in        <= mem_to_compute;
-		    compute_to_buffer   <= quantizer_out;
-		end else if (~compute_en && quantizer_en && relu_en) begin // quantizer and relu
-		    quantizer_in      <= mem_to_compute;
-		    relu_in           <= quantizer_out;
-		    compute_to_buffer <= relu_out; 
-		end else if (compute_en && ~quanitzer_en && ~relu_en) begin // only compute
-		    compute_in        <= mem_to_compute;
-		    compute_to_buffer <= compute_out;
-		end else if (compute_en && ~quantizer_en && relu_en) begin // compute and relu (ngl idk if this
-		    compute_in        <= mem_to_compute;		   // is even legal int16 in->int4 in)
-		    relu_in           <= compute_out;
-		    compute_to_buffer <= relu_out;
+	//	end else if (~compute_en && quantizer_en && ~relu_en) begin // only quantizer
+	//	    quantizer_in        <= mem_to_compute;
+	//	    compute_to_buffer   <= quantizer_out;
+	//	end else if (~compute_en && quantizer_en && relu_en) begin // quantizer and relu
+	//	    quantizer_in      <= mem_to_compute;
+	//	    relu_in           <= quantizer_out;
+	//	    compute_to_buffer <= relu_out; 
+		//end else if (compute_en && ~quantizer_en && ~relu_en) begin // only compute
+		//    compute_in        <= mem_to_compute;
+		//    compute_to_buffer <= compute_out;
+	//	end else if (compute_en && ~quantizer_en && relu_en) begin // compute and relu (ngl idk if this
+	//	    compute_in        <= mem_to_compute;		   // is even legal int16 in->int4 in)
+	//	    relu_in           <= compute_out;
+	//	    compute_to_buffer <= relu_out;
 		end else if (compute_en && quantizer_en && ~relu_en) begin // compute and quantizer
 		    compute_in        <= mem_to_compute;
 		    quantizer_in      <= compute_out;
 		    compute_to_buffer <= quantizer_out;
 		end else if (compute_en && quantizer_en && relu_en) begin // all three
 		    compute_in        <= mem_to_compute;
-		    quanitzer_in      <= compute_out;
+		    quantizer_in      <= compute_out;
 		    relu_in           <= quantizer_out;
 		    compute_to_buffer <= relu_out;
 		end
@@ -438,7 +434,7 @@ module top #(
 		buffer_fifo_en    <= 1'b0;
 		buffer_compute_en <= 1'b0;
 		buffer_store_en   <= 1'b1;
-		fifo_to_buffer[BUFFER_DATA_WIDTH-1:0] <= store_val;
+		controller_to_buffer <= store_val;
 		if (buffer_done) begin
 		    buffer_we       <= '0;
 		    buffer_store_en <= '0;
