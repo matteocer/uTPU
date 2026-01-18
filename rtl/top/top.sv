@@ -577,14 +577,10 @@ module top #(
 		tx_wdata <= 8'hAA;
 	    end
 	end else if (FORCE_UART_ECHO) begin
-	    if (rx_valid) begin
-		tx_echo_pending <= 1'b1;
-		tx_echo_data    <= rx_to_fifo;
-	    end
-	    if (tx_echo_pending && ~tx_full) begin
+	    // Write received bytes directly to TX FIFO (256-byte buffer handles bursts)
+	    if (rx_valid && ~tx_full) begin
 		tx_we <= 1'b1;
-		tx_wdata <= tx_echo_data;
-		tx_echo_pending <= 1'b0;
+		tx_wdata <= rx_to_fifo;
 	    end
 	end else if (DEBUG_STORE_ACK && store_ack_pending && ~tx_full) begin
 	    tx_we <= 1'b1;

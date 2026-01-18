@@ -8,8 +8,9 @@ module clk_divider #(
 	output logic baud_tick
     );
 
-    localparam integer DIVIDER_COUNT = (UART_CLK == 0) ? 1 : (INPUT_CLK / UART_CLK);
-    localparam integer COUNT_WIDTH = (DIVIDER_COUNT > 1) ? $clog2(DIVIDER_COUNT) : 1;
+    // Integer divider - simple and jitter-free
+    localparam integer DIVIDER_COUNT = INPUT_CLK / UART_CLK;
+    localparam integer COUNT_WIDTH = $clog2(DIVIDER_COUNT + 1);
 
     logic [COUNT_WIDTH-1:0] count;
 
@@ -18,9 +19,9 @@ module clk_divider #(
             count <= '0;
             baud_tick <= 1'b0;
         end else begin
-            if (count == DIVIDER_COUNT - 1) begin
+            if (count >= DIVIDER_COUNT - 1) begin
                 count <= '0;
-                baud_tick <= 1'b1; // one-cycle tick at (INPUT_CLK / DIVIDER_COUNT)
+                baud_tick <= 1'b1;
             end else begin
                 count <= count + 1'b1;
                 baud_tick <= 1'b0;

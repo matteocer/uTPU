@@ -31,6 +31,7 @@ def main() -> int:
 
     with UARTDriver(args.port, baud=args.baud, timeout=args.timeout, write_timeout=args.write_timeout) as uart:
         uart.flush_input()
+        time.sleep(0.05)  # Let FPGA settle after flush
         print(f"Sending {len(payload)} bytes...")
         uart.send_bytes_to_chip(payload)
         uart.flush_output()

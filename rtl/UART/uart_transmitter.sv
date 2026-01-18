@@ -16,8 +16,12 @@ module uart_transmitter #(
     typedef enum logic [1:0] { IDLE, START, MESSAGE, STOP } state_e;
     state_e current_state;
 
-    integer transmitting_bit;
-    integer tick_count;
+    // Use explicit widths for synthesis (integers can cause 32-bit inferences)
+    localparam int BIT_CNT_W = $clog2(UART_BITS_TRANSFERED) + 1;
+    localparam int TICK_CNT_W = $clog2(OVERSAMPLE) + 1;
+
+    logic [BIT_CNT_W-1:0] transmitting_bit;
+    logic [TICK_CNT_W-1:0] tick_count;
     logic start_pending;
     logic [UART_BITS_TRANSFERED-1:0] latched_message;
 
