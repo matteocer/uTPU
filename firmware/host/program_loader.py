@@ -163,13 +163,14 @@ class ProgramLoader:
 
     # sends reset sequence to chip
     def resetChip(self):
-        self._log("Resetting chip...")
+        # NOTE: HALT puts the current RTL into a terminal state.
+        # Until the hardware reset line is asserted, the core won't process new UART bytes.
+        # So "reset" here just clears host-side buffers.
+        self._log("Resetting chip (host-side flush only)...")
         self.uart.flush_input()
-        for _ in range(5):
-            self.sendInstructions(encodeHalt())
-        time.sleep(0.1)
+        time.sleep(0.05)
         self.uart.flush_input()
-        self._log("Chip reset complete")
+        self._log("Chip reset complete (host-side)")
 
 
 if __name__ == "__main__":

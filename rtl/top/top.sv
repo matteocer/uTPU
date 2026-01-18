@@ -2,6 +2,8 @@ module top #(
 	parameter UART_BITS_TRANSFERED   = 8,
 	parameter UART_INPUT_CLK         = 100000000,
 	parameter UART_BAUD              = 115200,
+	parameter FORCE_UART_AA          = 0,
+	parameter FORCE_UART_ECHO        = 1,
 	parameter ALPHA			 = 2,
 	parameter COMPUTE_DATA_WIDTH     = 4,
 	parameter ACCUMULATOR_DATA_WIDTH = 16, 
@@ -18,9 +20,11 @@ module top #(
 	parameter QUANTIZER_SIZE         = ARRAY_SIZE*ARRAY_SIZE,
 	parameter QUANTIZER_SIZE_WIDTH   = $clog2(QUANTIZER_SIZE),
 	parameter NUM_COMPUTE_LANES      = ARRAY_SIZE*ARRAY_SIZE,
-	parameter STORE_DATA_WIDTH       = 16
+	parameter STORE_DATA_WIDTH       = 16,
+    parameter DEBUG_STORE_ACK        = 0,
+    parameter DEBUG_FETCH_ACK        = 1
     ) (
-	input  logic clk, rst, start,
+	input  logic clk, rst,
 	input  logic rx,
 	output logic tx,
 	output logic led_rst
@@ -34,6 +38,14 @@ module top #(
     logic 	                 bot_mem;
     logic 		   	 mem_section; // used for fifo where 0 top / 1 bot
     logic [BUFFER_WORD_SIZE-1:0] store_val;    
+    logic [ADDRESS_SIZE-1:0]     store_src_addr;
+    logic [ADDRESS_SIZE-1:0]     store_dest_addr;
+    logic                        store_ready;
+    logic                        store_half;
+    logic [1:0]                  store_word_idx;
+    logic [7:0]                  store_byte_lo;
+    logic [BUFFER_WORD_SIZE-1:0] store_word2;
+    logic [BUFFER_WORD_SIZE-1:0] store_word3;
     // FIFO reciever control signals/flags
     logic rx_we, rx_re, rx_empty, rx_full, rx_valid;
     logic rx_we_d;
@@ -52,6 +64,10 @@ module top #(
     logic [FIFO_DATA_WIDTH-1:0] tx_wdata;
     logic                       tx_pending;
     logic [FIFO_DATA_WIDTH-1:0] tx_pending_data;
+    logic                       tx_busy;
+    logic                       tx_pop_inflight;
+    logic                       tx_start_mux;
+    logic [UART_BITS_TRANSFERED-1:0] tx_message_mux;
 
 
     // MAC Array control signals/flags
@@ -79,7 +95,22 @@ module top #(
     logic [STORE_DATA_WIDTH-1:0]   controller_to_buffer;
     logic [STORE_DATA_WIDTH-1:0]   buffer_to_controller;
     logic [23:0] rst_blink;
+    logic        rx_led;
+    logic        rst_int;
+    logic [23:0] uart_spam_div;
+    logic        tx_echo_pending;
+    logic [7:0]  tx_echo_data;
+    logic        store_ack_pending;
+    logic [7:0]  store_ack_data;
+    logic [7:0]  debug_tx_q [0:7];
+    logic [3:0]  debug_tx_q_count;
+    logic [3:0]  debug_tx_q_rd;
+    logic [7:0]  rx_trace [0:5];
+    logic        buffer_done_d;
 
+
+    // Treat external reset as active-low; internal logic uses active-high reset.
+    assign rst_int = ~rst;
 
     uart #(
 	.UART_BITS_TRANSFERED(UART_BITS_TRANSFERED),
@@ -87,21 +118,27 @@ module top #(
 	.UART_CLK(UART_BAUD)
     ) u_uart (
 	.clk(clk),
-	.rst(rst),
-	.tx_start(tx_start),
+	.rst(rst_int),
+	.tx_start(tx_start_mux),
 	.rx(rx),
 	.rx_valid(rx_valid),
 	.tx(tx),
-	.tx_message(tx_to_fifo),
-	.rx_result(rx_to_fifo)
+	.tx_message(tx_message_mux),
+	.rx_result(rx_to_fifo),
+	.tx_busy(tx_busy)
     );
+
+    // Always feed the UART from the TX FIFO; echo mode just pushes RX bytes into
+    // that FIFO so the UART can stream them back without dropping bursts.
+    assign tx_start_mux   = tx_start;
+    assign tx_message_mux = tx_to_fifo;
 
     fifo_rx #(
 	.FIFO_WIDTH(FIFO_WIDTH),
 	.FIFO_DATA_WIDTH(FIFO_DATA_WIDTH)
     ) fifo_in (
 	.clk(clk),
-	.rst(rst),
+	.rst(rst_int),
 	.we(rx_we),	// These go to the controller
 	.re(rx_re),
 	.valid(rx_valid),
@@ -117,7 +154,7 @@ module top #(
 	.FIFO_DATA_WIDTH(FIFO_DATA_WIDTH)
     ) fifo_out (
 	.clk(clk),
-	.rst(rst),
+	.rst(rst_int),
 	.we(tx_we),
 	.re(tx_re),
 	.start(tx_start),
@@ -136,7 +173,7 @@ module top #(
 	.NUM_COMPUTE_LANES(NUM_COMPUTE_LANES)
     ) u_pe_array (
 	.clk(clk),
-	.rst(rst),
+	.rst(rst_int),
 	.compute(compute_start),
 	.load_en(compute_load_en),
 	.done(compute_done),
@@ -207,12 +244,12 @@ module top #(
     state_e next_state;
 
     typedef enum logic [OPCODE_WIDTH-1:0] {
-	STORE_OP,
-	FETCH_OP,
-	RUN_OP,
-	LOAD_OP,
-	HALT_OP,
-	NOP    
+	STORE_OP = 3'b000,
+	FETCH_OP = 3'b001,
+	RUN_OP   = 3'b010,
+	LOAD_OP  = 3'b011,
+	HALT_OP  = 3'b100,
+	NOP      = 3'b101
     } opcode_e;
     
     typedef enum logic {
@@ -234,10 +271,18 @@ module top #(
 
     // NEXT STATE FSM
     always_ff @(posedge clk) begin
-	if (rst)
+	if (rst_int)
 	    current_state <= RESET_STATE;
 	else 
 	    current_state <= next_state;	
+    end
+
+    // One-cycle delayed buffer_done to align with data availability from unified_buffer reads
+    always_ff @(posedge clk) begin
+	if (rst_int)
+	    buffer_done_d <= 1'b0;
+	else
+	    buffer_done_d <= buffer_done;
     end
 
     always_comb begin
@@ -249,11 +294,11 @@ module top #(
 		if (fetch_mode == FETCH_INSTRUCTION) begin
 		    if (instr_ready)
 			next_state = DECODE_STATE;
-		end else if (~rx_empty && instruction_half) begin
-		    if (fetch_mode == FETCH_ADDRESS && address_indicator && ~fetch_bot)
-			next_state = FETCH_ADDRESS_STATE;
-		    else if (fetch_mode == FETCH_ADDRESS && fetch_bot)
+		end else if (fetch_mode == FETCH_ADDRESS && store_ready) begin
+		    if (address_indicator)
 			next_state = STORE_STATE;
+		    else
+			next_state = FETCH_ADDRESS_STATE;
 		end
 	    end
 	    DECODE_STATE:
@@ -272,13 +317,13 @@ module top #(
 			next_state = FETCH_FIFO_STATE;
 		endcase
 	    FETCH_ADDRESS_STATE:
-		if (buffer_done)
-		    next_state = FETCH_FIFO_STATE;
+		if (buffer_done_d)
+		    next_state = STORE_STATE;
 	    FETCH_BUFFER_STATE:
-		if (buffer_done)
+		if (buffer_done_d)
 		   next_state = FETCH_FIFO_STATE;
 	    LOAD_STATE:
-		if (buffer_done)
+		if (buffer_done_d)
 		    next_state = FETCH_FIFO_STATE;
 	    COMPUTE_STATE: // THIS MIGHT WORK as it just waits for stored final value
 		if (compute_done)
@@ -308,6 +353,35 @@ module top #(
 		tx_pending       <= 1'b0;
 		tx_pending_data  <= '0;
 		tx_selftest_sent <= 1'b0;
+		uart_spam_div    <= '0;
+		tx_echo_pending <= 1'b0;
+		tx_echo_data    <= '0;
+		rx_led          <= 1'b0;
+		store_src_addr  <= '0;
+		store_dest_addr <= '0;
+		store_half      <= 1'b0;
+		store_word_idx  <= 2'b0;
+		store_byte_lo   <= '0;
+		store_word2     <= '0;
+		store_word3     <= '0;
+		store_ack_pending <= 1'b0;
+		store_ack_data    <= 8'h00;
+		store_ready       <= 1'b0;
+		debug_tx_q_count  <= 4'd0;
+		debug_tx_q_rd     <= 4'd0;
+		for (int di = 0; di < 8; di++) begin
+		    debug_tx_q[di] <= 8'h00;
+		end
+		for (int dj = 0; dj < 6; dj++) begin
+		    rx_trace[dj] <= 8'h00;
+		end
+		compute_en       <= 1'b0;
+		quantizer_en     <= 1'b0;
+		relu_en          <= 1'b0;
+		compute_load_en  <= 1'b0;
+		buffer_fifo_en   <= 1'b0;
+		buffer_compute_en<= 1'b0;
+		buffer_store_en  <= 1'b0;
 	    end
 	    // before you enter, you must set fetch_mode and
 	    // instruction_half to 0
@@ -328,24 +402,40 @@ module top #(
 			    end
 			end
 			FETCH_ADDRESS: begin
-			    if (address_indicator) begin // if fetching values from mem
-				if (instruction_half) begin
-				    address[ADDRESS_SIZE-1:FIFO_DATA_WIDTH] <= rx_fifo_to_mem;
-				    instruction_half <= 1'b0;
+			    // Receive word2 and word3 as 16-bit little-endian words.
+			    if (~store_half) begin
+				store_byte_lo <= rx_fifo_to_mem;
+				store_half <= 1'b1;
+			    end else begin
+				store_half <= 1'b0;
+				if (store_word_idx == 2'b0) begin
+				    store_word2 <= {rx_fifo_to_mem, store_byte_lo};
+				    store_word_idx <= 2'b1;
+				    if (!address_indicator) begin
+					store_src_addr <= {rx_fifo_to_mem, store_byte_lo};
+				    end
 				end else begin
-				    address[FIFO_DATA_WIDTH-1:0] <= rx_fifo_to_mem;
-				    instruction_half <= 1'b1;
-				end
-			    end else begin // if fetching the values from fifo
-				if (instruction_half) begin
-				    store_val[FIFO_DATA_WIDTH*2-1:FIFO_DATA_WIDTH] <= rx_fifo_to_mem;
-				    instruction_half    <= '0;
-				end else begin
-				    store_val[FIFO_DATA_WIDTH-1:0] <= rx_fifo_to_mem;
-				    instruction_half    <= 1'b1;
+				    store_word3 <= {rx_fifo_to_mem, store_byte_lo};
+				    store_word_idx <= 2'b0;
+				    store_dest_addr <= {rx_fifo_to_mem, store_byte_lo};
+				    if (address_indicator) begin
+					store_val <= store_word2;
+				    end
+				    store_ready <= 1'b1;
+				    if (DEBUG_STORE_ACK) begin
+					debug_tx_q[0] <= 8'hA5;
+					debug_tx_q[1] <= store_word2[7:0];
+					debug_tx_q[2] <= store_word2[15:8];
+					debug_tx_q[3] <= store_dest_addr[7:0];
+					debug_tx_q[4] <= rx_trace[0];
+					debug_tx_q[5] <= rx_trace[1];
+					debug_tx_q[6] <= rx_trace[2];
+					debug_tx_q[7] <= 8'h5A;
+					debug_tx_q_count <= 4'd8;
+					debug_tx_q_rd    <= 4'd0;
+				    end
 				end
 			    end
-			    fetch_bot <= 1'b1;
 			end
 		    endcase
 		end else if (~rx_pending && ~rx_we && ~rx_empty) begin
@@ -360,6 +450,9 @@ module top #(
 		    STORE_OP: begin	
 			address_indicator <= (instruction[4]) ? 1'b1 : 1'b0;
 			fetch_mode <= FETCH_ADDRESS;
+			instruction_half <= 1'b0;
+			store_half <= 1'b0;
+			store_word_idx <= 2'b0;
 		    end
 		    FETCH_OP: begin
 			bot_mem    <= (instruction[3]) ? 1'b1 : 1'b0;
@@ -384,14 +477,15 @@ module top #(
 		rx_re <= '0;
 		if (~tx_full) begin
 		    compute_load_en <= 1'b0;
+		    address         <= store_src_addr;
 		    buffer_re       <= 1'b1;
 		    buffer_we       <= 1'b0;
 		    buffer_store_en <= 1'b1;
-		    if (buffer_done) begin
+		    if (buffer_done_d) begin
 			store_val       <= buffer_to_controller[BUFFER_WORD_SIZE-1:0];
+			address         <= store_dest_addr;
 			buffer_re       <= 1'b0;
 			buffer_store_en <= 1'b0;
-			fetch_bot       <= 1'b1;
 		    end
 		end
 	    end
@@ -401,18 +495,21 @@ module top #(
 		buffer_fifo_en    <= 1'b1;
 		buffer_compute_en <= 1'b0;
 		section           <= bot_mem;
-		if (buffer_done) begin
+		if (buffer_done_d) begin
 		    buffer_fifo_en <= 1'b0;
 		    buffer_re      <= 1'b0;
 		    tx_pending     <= 1'b1;
-		    tx_pending_data <= mem_to_tx_fifo;
+		    if (DEBUG_FETCH_ACK)
+			tx_pending_data <= 8'hCC; // debug marker for fetch return
+		    else
+			tx_pending_data <= mem_to_tx_fifo;
 		end
 	    end
 	    LOAD_STATE: begin
 		compute_en        <= 1'b0; // maybe not needed 
 		buffer_re 	  <= 1'b1;
 		buffer_compute_en <= 1'b1;
-		if (buffer_done) begin
+		if (buffer_done_d) begin
 		    compute_in        <= mem_to_compute;
 		    buffer_re         <= 1'b0;
 		    buffer_compute_en <= 1'b0;
@@ -457,52 +554,103 @@ module top #(
 		buffer_fifo_en    <= 1'b0;
 		buffer_compute_en <= 1'b0;
 		buffer_store_en   <= 1'b1;
+		address           <= store_dest_addr;
 		controller_to_buffer <= store_val;
 		if (buffer_done) begin
 		    buffer_we       <= '0;
 		    buffer_store_en <= '0;
+		    fetch_mode      <= FETCH_INSTRUCTION;
+		    instruction_half <= 1'b0;
+		    store_ready     <= 1'b0;
+		    store_half      <= 1'b0;
+		    store_word_idx  <= 2'b0;
+		    store_ack_pending <= 1'b0;
 		end
 	    end
 	endcase
 
-	// one-time TX self-test byte after reset
-	if (~tx_selftest_sent && ~tx_full) begin
+	// debug UART spam or normal TX path
+	if (FORCE_UART_AA) begin
+	    uart_spam_div <= uart_spam_div + 1'b1;
+	    if (~tx_full && uart_spam_div == '0) begin
+		tx_we <= 1'b1;
+		tx_wdata <= 8'hAA;
+	    end
+	end else if (FORCE_UART_ECHO) begin
+	    if (rx_valid) begin
+		tx_echo_pending <= 1'b1;
+		tx_echo_data    <= rx_to_fifo;
+	    end
+	    if (tx_echo_pending && ~tx_full) begin
+		tx_we <= 1'b1;
+		tx_wdata <= tx_echo_data;
+		tx_echo_pending <= 1'b0;
+	    end
+	end else if (DEBUG_STORE_ACK && store_ack_pending && ~tx_full) begin
 	    tx_we <= 1'b1;
-	    tx_wdata <= 8'hAA;
-	    tx_selftest_sent <= 1'b1;
-	end
+	    tx_wdata <= store_ack_data;
+	    store_ack_pending <= 1'b0;
+	end else if (DEBUG_STORE_ACK && debug_tx_q_count != 0 && ~tx_full) begin
+	    tx_we <= 1'b1;
+	    tx_wdata <= debug_tx_q[debug_tx_q_rd];
+	    debug_tx_q_rd <= debug_tx_q_rd + 1'b1;
+	    debug_tx_q_count <= debug_tx_q_count - 1'b1;
+	end else begin
+	    // one-time TX self-test byte after reset
+	    if (~tx_selftest_sent && ~tx_full) begin
+		tx_we <= 1'b1;
+		tx_wdata <= 8'hAA;
+		tx_selftest_sent <= 1'b1;
+	    end
 
-	// enqueue TX byte after buffer read completes
-	if (tx_pending && ~tx_full) begin
-	    tx_we   <= 1'b1;
-	    tx_wdata <= tx_pending_data;
-	    tx_pending <= 1'b0;
+	    // enqueue TX byte after buffer read completes
+	    if (tx_pending && ~tx_full) begin
+		tx_we   <= 1'b1;
+		tx_wdata <= tx_pending_data;
+		tx_pending <= 1'b0;
+	    end
 	end
     end
 
     // UART communication happens at the same time as everything else
     always_ff @(posedge clk) begin
-	// Rx Control (latch data, then write next cycle)
-	if (~rx_re && rx_valid) begin
+	if (rst_int) begin
+	    rx_we_d <= 1'b0;
+	    tx_re <= 1'b0;
+	    tx_pop_inflight <= 1'b0;
+	end else begin
+	// Rx Control: only capture when valid and we're not simultaneously issuing rx_re
+	if (rx_valid && ~rx_full) begin
 	    rx_data_buf <= rx_to_fifo;
 	    rx_we_d     <= 1'b1;
+	    rx_led      <= ~rx_led; // toggle on each received byte
+	    // capture recent RX bytes for debug
+	    rx_trace[5] <= rx_trace[4];
+	    rx_trace[4] <= rx_trace[3];
+	    rx_trace[3] <= rx_trace[2];
+	    rx_trace[2] <= rx_trace[1];
+	    rx_trace[1] <= rx_trace[0];
+	    rx_trace[0] <= rx_to_fifo;
 	end else begin
-	    rx_we_d <= 1'b0;
-	end
+		rx_we_d <= 1'b0;
+	    end
 
-	//Tx Control
-	if (~tx_we && ~tx_empty) begin
-	    tx_re <= 1'b1;
-	end else begin 
+	    // Tx Control: pop one byte only when UART is ready
 	    tx_re <= 1'b0;
+	    if (!tx_pop_inflight && ~tx_empty && ~tx_busy && ~tx_we) begin
+		tx_re <= 1'b1;
+		tx_pop_inflight <= 1'b1;
+	    end else if (tx_busy) begin
+		tx_pop_inflight <= 1'b0;
+	    end
 	end
     end
 
     assign rx_we = rx_we_d;
-    assign led_rst = ~rst & rst_blink[23];
+    assign led_rst = (~rst_int & rst_blink[23]) ^ rx_led;
 
     always_ff @(posedge clk) begin
-	if (~rst)
+	if (~rst_int)
 	    rst_blink <= rst_blink + 1'b1;
 	else
 	    rst_blink <= '0;

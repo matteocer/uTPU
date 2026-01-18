@@ -7,7 +7,7 @@ OPCODE_FETCH = 0b001 #1 - fetch data from buffer
 OPCODE_RUN = 0b010 #2 - execute
 OPCODE_LOAD = 0b011 #3 - load data into PE array
 OPCODE_HALT = 0b100 #4 - stop execution
-OPCODE_NOP = 0b111 #7 - no operation
+OPCODE_NOP = 0b101 #7 - no operation
 
 INSTRUCTION_WIDTH = 16
 ADDRESS_WIDTH = 9

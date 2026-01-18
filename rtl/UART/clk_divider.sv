@@ -1,31 +1,31 @@
 `timescale 1ns/1ps
-
 module clk_divider #(
-    	parameter INPUT_CLK            = 27000000,
-	parameter UART_CLK             = 1000000
+	parameter integer INPUT_CLK = 100_000_000, // board clock (E3 on Arty A7 Rev E)
+	parameter integer UART_CLK  = 1_843_200    // desired oversample-rate (UART_CLK * OVERSAMPLE)
     ) (
-	input  logic clk, rst,
-	output logic uart_clk
+	input  logic clk,
+	input  logic rst,
+	output logic baud_tick
     );
 
-    localparam DIVIDER_COUNT = INPUT_CLK / UART_CLK;
+    localparam integer DIVIDER_COUNT = (UART_CLK == 0) ? 1 : (INPUT_CLK / UART_CLK);
+    localparam integer COUNT_WIDTH = (DIVIDER_COUNT > 1) ? $clog2(DIVIDER_COUNT) : 1;
 
-    
-    logic [$clog2(DIVIDER_COUNT)-1:0] count;
+    logic [COUNT_WIDTH-1:0] count;
 
-
-    always_ff @(posedge clk) begin
-	if (rst) begin
-	    count <= '0;
-	    uart_clk <= 0;
-	end else begin
-	    count <= count + 1'b1;
-	    uart_clk <= 1'b0;
-	    if (count == DIVIDER_COUNT - 1) begin
-		uart_clk <= 1'b1;
-		count <= 0;
-	    end
-	end
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst) begin
+            count <= '0;
+            baud_tick <= 1'b0;
+        end else begin
+            if (count == DIVIDER_COUNT - 1) begin
+                count <= '0;
+                baud_tick <= 1'b1; // one-cycle tick at (INPUT_CLK / DIVIDER_COUNT)
+            end else begin
+                count <= count + 1'b1;
+                baud_tick <= 1'b0;
+            end
+        end
     end
 
-endmodule: clk_divider
+endmodule

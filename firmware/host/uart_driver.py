@@ -6,7 +6,7 @@ from typing import Optional, List
 class UARTDriver:
     FIFO_SIZE = 256
 
-    def __init__(self, port: str, baud: int = 115200, timeout: float = 1.0):
+    def __init__(self, port: str, baud: int = 115200, timeout: float = 1.0, write_timeout: float = 1.0):
         self.port = port
         self.baud = baud
         try:
@@ -16,8 +16,18 @@ class UARTDriver:
                 bytesize=serial.EIGHTBITS,
                 parity=serial.PARITY_NONE,
                 stopbits=serial.STOPBITS_ONE,
-                timeout=timeout
+                timeout=timeout,
+                write_timeout=write_timeout,
+                xonxoff=False,
+                rtscts=False,
+                dsrdtr=False
             )
+            # Ensure timeouts and flow control are set as expected.
+            self.ser.timeout = timeout
+            self.ser.write_timeout = write_timeout
+            self.ser.xonxoff = False
+            self.ser.rtscts = False
+            self.ser.dsrdtr = False
             print(f"UART connected: {port} @ {baud} baud")
         except serial.SerialException as e:
             #raised if port doesn't exist or is alr in use

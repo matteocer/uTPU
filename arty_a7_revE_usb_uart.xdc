@@ -1,9 +1,9 @@
 ## Arty A7 Rev E constraints for 100 MHz clock (E3) and USB-UART.
 ## Ports assumed: clk, rx, tx
-## Reset pin
-set_property -dict { PACKAGE_PIN C2 IOSTANDARD LVCMOS33 } [get_ports { rst }];
 ## Reset indicator LED
 set_property -dict { PACKAGE_PIN H5 IOSTANDARD LVCMOS33 } [get_ports { led_rst }];
+## Reset pin
+set_property -dict { PACKAGE_PIN C2 IOSTANDARD LVCMOS33 } [get_ports { rst }];
 
 ## Configuration bank voltage
 set_property CFGBVS VCCO [current_design]
